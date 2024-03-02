@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Bootstring Decoding | frereit's blog</title>
+    <link rel="stylesheet" type="text/css" href="/blog.css">
+    <meta name="description" content="Bootstring is an encoding for Unicode strings. How does it work?">
+    <meta name="keywords" content="bootstring, unicode, encoding, punycode">
+    <meta name="author" content="frereit">
+</head>
+
+<body>
+    <header>
+        <a class="logo" href="/">Home</a>
+        <nav>
+            <a rel="me" href="https://github.com/frereit">GitHub</a>
+            <a rel="me" href="https://infosec.exchange/@fre">Mastodon</a>
+        </nav>
+    </header>
+    <h1>Bootstring Part 1: Decoding</h1>
+
+    <p>
+        You may know about <a href="https://en.wikipedia.org/wiki/Punycode">Punycode</a>, a way to represent Unicode
+        strings with only ASCII characters. It is used to encode domain names, for example "münchen.de" becomes
+        "xn--mnchen-3ya.de". Punycode, specified in <a href="https://tools.ietf.org/html/rfc3492">RFC 3492</a>, is
+        technically just a set of parameters for a more general algorithm called Bootstring, which is specified in the
+        same document. In this post, I will explain how Bootstring works and how to use it to decode an encoded string.
+    </p>
+
+    <h2>The Basics</h2>
+
+    <p>
+        Bootstring is a way to encode arbitrary sequences of Unicode code points as a sequence of a smaller set of code
+        points. In Punycode, the smaller set of code points is chosen to be the ASCII character set but any set of code
+        points can be used<sup class="footnote-reference"><a id="footnote-reference-1" href="#footnote-1">1</a></sup>.
+        The full, raw Unicode string is called the <strong>extended string</strong> (for example "München") and the
+        encoded string is called the <strong>basic string</strong> (for example "Mnchen-3ya"). The basic string is
+        always a valid sequence of code points from the smaller set, while the extended string can contain any Unicode
+        code point.
+    </p>
+
+    <h2>Bootstring state machine</h2>
+
+    <p>
+        At the heart of Bootstring lies a simple state machine that consists of two variables:
+    </p>
+    <ul>
+        <li><strong><code>n</code></strong>: The current code point that should be inserted.</li>
+        <li><strong><code>i</code></strong>: The position in the current string where it will be inserted.</li>
+    </ul>
+    <p>
+        Bootstring, when decoding a basic string, iterates through this state machine and inserts the code point
+        <code>n</code> at the position <code>i</code> at just the right time to produce the extended string. The initial
+        value for <code>n</code> is a domain parameter of Bootstring (<code>initial_n</code>).
+    </p>
+    <p>
+        I think it's easiest to understand this state machine by looking at an example. Below we have the string
+        "bootstring". The state machine starts off with <code>n = 128</code> and <code>i = 0</code>, so pointing at the
+        very beginning of the string. Every time we advance the state machine, we increment <code>i</code>. When
+        <code>i</code> reaches the end of the string,
+        we wrap around to the beginning of the string and increment <code>n</code>.
+    </p>
+
+    <p>
+        Press "Next" to advance the state machine a single step and see how <code>n</code> and <code>i</code> change.
+        Press "Reset" to reset the state machine to its initial state.
+    </p>
+
+    <p>
+    <div class="highlight">
+        <pre
+            id="state-machine-1"><noscript>Unfortunately, this demo only works with JavaScript enabled.</noscript></pre>
+    </div>
+    <button id="next-1">Next state</button>
+    <button id="reset-1">Reset</button>
+    <script>
+        (() => {
+            let stateMachine = document.getElementById("state-machine-1");
+            let nextButton = document.getElementById("next-1");
+            let resetButton = document.getElementById("reset-1");
+            let i = 0;
+            let n = 128;
+            function render() {
+                let text = " b o o t s t r i n g \n";
+                let padding = " ".repeat(2 * i);
+                let arrow = padding + "↑\n";
+                let state = padding + "i=" + i + "\n" + padding + "n=" + n;
+                stateMachine.textContent = text + arrow + state;
+            }
+            nextButton.addEventListener("click", function () {
+                i = (i + 1) % 11;
+                if (i === 0) {
+                    n++;
+                }
+                render();
+            });
+            resetButton.addEventListener("click", function () {
+                i = 0;
+                n = 128;
+                render();
+            });
+            render();
+        })();
+    </script>
+    </p>
+
+    <h2>Producing an extended string</h2>
+    <p>
+        A basic string is simply a recipe for how to advance the state machine to produce the extended string. It is
+        composed of an optional <strong>literal portion</strong> with a delimeter and a set of <strong>delta
+            values</strong>. The literal portion is copied verbatim to the extended string, while the delta values are
+        used to advance the state machine. The delimeter is used to separate the literal portion from the delta values.
+        For example, the basic string "Mnchen-3ya" has the literal portion "Mnchen" and the delta values "3ya". What
+        delimeter is used is a domain parameter of Bootstring and is set to "-" in Punycode.
+    </p>
+    </p>
+    Although seemingly just a string, the delta values are actually a sequence of numbers. In the case of
+    "3ya", the delta values only contain a single value: <code>deltas=[869]</code>. We'll get to how the string
+    "3ya" is converted to the number 869 in a moment but for now let's focus on how the basic string is used to produce
+    the extended string, given the literal portion "Mnchen" and the delta values <code>[869]</code>.
+    </p>
+    So, we have split the basic string into the literal portion "Mnchen" and the delta values <code>deltas=[896]</code>.
+    We start of by setting the extended string to the literal portion. Then, we take the first value from the delta
+    values and advance the state machine by that number of steps. In this case, we advance the state machine by 869
+    steps. We then insert the current code point <code>n</code> at the current position <code>i</code> in the extended
+    string. In our case, we only have a single value in the delta values, so we are done but if we had more values, we
+    would continue to advance the state machine and insert code points until we have used all the values in the delta
+    values.
+    <p>
+
+    <p>
+        Again, let's take a look at an example. Below we start off with the extended string "Mnchen", the delta values
+        <code>deltas=[869]</code>, and the state machine at <code>n=128</code> and <code>i=0</code>. First, we advance
+        the state machine 869 steps as specified by the delta values. Then, we insert the code point in <code>n</code>
+        at position <code>i</code> in the extended string.
+    <p>
+    <div class="highlight">
+        <pre
+            id="state-machine-2"><noscript>Unfortunately, this demo only works with JavaScript enabled.</noscript></pre>
+    </div>
+    <button id="next-2">Advance 869 states</button>
+    <button id="reset-2">Reset</button>
+    <script>
+        (() => {
+            let stateMachine = document.getElementById("state-machine-2");
+            let nextButton = document.getElementById("next-2");
+            let resetButton = document.getElementById("reset-2");
+            let i = 0;
+            let n = 128;
+            let num_steps = 0;
+            let advance_loop = 0;
+            let string = "Mnchen";
+            function render() {
+                let text = "";
+                for (let j = 0; j < string.length; j++) {
+                    text += " " + string[j];
+                }
+                text += "\n";
+                let padding = " ".repeat(2 * i);
+                let arrow = padding + "↑\n";
+                let state = padding + "i=" + i + "\n" + padding + "n=" + n;
+                stateMachine.textContent = text + arrow + state;
+            }
+            function advance() {
+                if (num_steps < 869) {
+                    i = (i + 1) % (string.length + 1);
+                    if (i === 0) {
+                        n++;
+                    }
+                    num_steps++;
+                    render();
+                    if (num_steps > 50) {
+                        advance_loop = requestAnimationFrame(advance);
+                    } else if (num_steps > 30) {
+                        advance_loop = setTimeout(advance, 50);
+                    } else {
+                        advance_loop = setTimeout(advance, 100);
+                    }
+                } else {
+                    nextButton.removeAttribute("disabled");
+                    cancelAnimationFrame(advance_loop);
+                    clearTimeout(advance_loop);
+                    nextButton.innerText = "Insert code point";
+                }
+            }
+            nextButton.addEventListener("click", function () {
+                if (num_steps == 0) {
+                    advance();
+                    nextButton.setAttribute("disabled", "disabled");
+                } else {
+                    string = string.slice(0, i) + String.fromCodePoint(n) + string.slice(i);
+                    nextButton.setAttribute("disabled", "disabled");
+                    i = (i + 1) % (string.length + 1);
+                    if (i === 0) {
+                        n++;
+                    }
+                    num_steps++;
+                    render();
+                }
+            });
+            resetButton.addEventListener("click", function () {
+                cancelAnimationFrame(advance_loop);
+                clearTimeout(advance_loop);
+                nextButton.removeAttribute("disabled");
+                nextButton.innerText = "Advance 869 states";
+                string = "Mnchen";
+                num_steps = 0;
+                i = 0;
+                n = 128;
+                render();
+            });
+            render();
+        })();
+    </script>
+    </p>
+
+    <p>
+        As you can see, after inserting <code>n</code> at the position we reached after 869 steps, the extended string
+        is now "München". So we have successfully used the basic string "Mnchen-3ya" to produce the
+        extended string "München". <strong>And that, in a nutshell, is Bootstring!</strong> We simply use the delta values to advance the
+        state machine and insert the code points every time we reach a position specified by the delta values.
+    </p>
+    <p>
+        Typically, the code points in a given extended string are somewhat close to each other. For example, a domain
+        might contain a sequence of code points from the cyrillic block or a sequence of code points from traditional
+        Chinese but is unlikely to contain a mix of code points from different blocks. This is why Bootstring encodes
+        delta values instead of absolute positions in the state machine. Once we have reached a position where we should
+        insert a code point, it is probable that the next code point will be close to the current one.
+    </p>
+
+    <h2>Decoding the delta values</h2>
+
+    <p>
+        We just looked at how we can decode a basic string but ignored the part about how the string "3ya" is converted
+        to the number 869. This is done using <strong>generalized variable-length integers</strong>. Let's take a look
+        at how this works.
+    </p>
+    <p>
+        Let's say we want to encode the delta values <code>[869, 13, 37]</code> as a string. One way to do this would be
+        to write the numbers simply concatenated with some delimeter, "869-13-37". If we want to avoid using delimiters
+        we have to use fixed length integers, for example by padding the numbers with zeros, "086900130037"<sup
+            class="footnote-reference"><a id="footnote-reference-2" href="#footnote-2">2</a></sup>. In both cases, we
+        can quite trivially decode the string back to the list of numbers. However, this is not very space efficient.
+        This is where generalized variable-length integers come in.
+    </p>
+
+    <p>
+        As a reminder, let's quickly go over how the base 10 system works. In base 10, we have 10 digits, 0-9. A number
+        is a sequence of these digits and each digit is multipled with some power of 10 to get the final number. For
+        example, the number 123 is <code>1 × 100 + 2 × 10 + 3 × 1</code>. We can also write this as
+        <code>1 × 10<sup>2</sup> + 2 × 10<sup>1</sup> + 3 × 10<sup>0</sup></code>. In general, the digit at
+        position <code>i</code> is multiplied with a weight <code>w(i) = 10<sup>i</sup></code>. We can also write the
+        weight function as a recursive function <code>w(i) = 10 × w(i-1)</code> with the base case
+        <code>w(0) = 1</code>.
+    </p>
+
+    <p>
+        Generalized variable-length integers work in a similar way but instead of using a weight function like
+        <code>w(i)=b<sup>i</sup></code> where <code>b</code> is the base and <code>i</code> is the position of the
+        digit, it uses a more complex weight function. This is what makes them "generalized".
+    </p>
+
+    <p>
+        In generalized variable-length integers, we introduce a new function that we use to define the weight function.
+        It is called the <strong>threshold</strong>, denoted as <code>t(i)</code>. Every digit of a number must be
+        greater than or equal to the threshold at that position, except for the last digit which is always less than the
+        threshold. Writing the weight function as a recursive function, we keep the base case <code>w(0) = 1</code> but
+        replace the recursive case with <code>w(i) = w(i - 1) × (b - t(i - 1))</code>.
+        The thresholds are simply a new part of our number system, just like the base is. We need to specify the
+        thresholds before we can encode or decode a number.
+    </p>
+    <p>
+        Again, I think it's best explained using an example. Let's try to decode the mysterios "3ya" string from before.
+        Its digits are in base 36 and for now, we assume the thresholds are <code>[1, 1, 26]</code>. We start off by
+        writing each digit of the number into the table below, along with the threshold for that position. Then, we
+        calculate the weight and the value of each digit by multiplying the weight with the digit and the threshold.
+        Finally, we add up the values to get the final number.
+    </p>
+    <p>
+        Notice that the number is encoded as little-endian, so the digit that is multipled with <code>w(0) = 1</code>
+        comes first.
+    </p>
+    <table>
+        <tr>
+            <th>Digit (Decimal)</th>
+            <th>Threshold</th>
+            <th>Weight</th>
+            <th>Value</th>
+        </tr>
+        <tr>
+            <td>3 (29)</td>
+            <td>1</td>
+            <td>1</td>
+            <td>29 × 1<br />= 29</td>
+        </tr>
+        <tr>
+            <td>y (24)</td>
+            <td>1</td>
+            <td>1 × (36 - 1)<br />= 35</td>
+            <td>24 × 35<br />= 840</td>
+        </tr>
+        <tr>
+            <td>a (0)</td>
+            <td>26</td>
+            <td>35 × (36 - 1)<br />= 1225</td>
+            <td>0 × 1225<br />= 0</td>
+        </tr>
+    </table>
+    <p>
+        Adding up the values, we get <code>29 + 840 + 0 = 869</code>. So the string "3ya" is decoded to the number 869.
+        And, as you can see, all digits are greater than or equal to the threshold at that position, except for the last
+        digit which is less than the threshold. This is what makes it a valid generalized variable-length integer and
+        allows us to determine when we have reached the end of the number in the deltas string without using a
+        delimiter.
+    </p>
+    <h3>Calculating the thresholds</h3>
+    <p>
+        We now know how to decode a generalized variable-length integer but we still need to know how to calculate the
+        thresholds. The threshold function is expressed in terms of a <strong>bias</strong> which is chosen so that the
+        encoded numbers use as few digits as possible. The threshold function is defined as
+        <code>t(i) = b × (i + 1) - bias</code> for a position <code>i</code> and may never exceed a maximum threshold
+        <code>tmax</code> or fall below a minimum threshold <code>tmin</code>. <code>tmax</code> and <code>tmin</code>
+        are domain parameters and are set to 26 and 1 respectively for Punycode.
+    </p>
+    <p>
+        Below you can experiment with the bias, <code>tmin</code> and <code>tmax</code> and see how the thresholds
+        change. You can also input a value and see how it is encoded using the thresholds.
+    </p>
+
+    <table>
+        <tr>
+            <th>bias: <span id="bias"></span></th>
+            <th>tmin: <span id="tmin"></span></th>
+            <th>tmax: <span id="tmax"></span></th>
+            <th>value</th>
+        </tr>
+        <tr>
+            <td><input type="range" id="bias-slider" min="0" max="120" value="72" step="1"></td>
+            <td><input type="range" id="tmin-slider" min="1" max="36" value="1" step="1"></td>
+            <td><input type="range" id="tmax-slider" min="1" max="36" value="26" step="1"></td>
+            <td><input type="number" id="number-input" value="869" step="1"></td>
+        </tr>
+        <script>
+            (() => {
+                // update bias, tmin and tmax on change
+                function update() {
+                    document.getElementById("bias").textContent = document.getElementById("bias-slider").value;
+                    document.getElementById("tmin").textContent = document.getElementById("tmin-slider").value;
+                    document.getElementById("tmax").textContent = document.getElementById("tmax-slider").value;
+                }
+                document.getElementById("bias-slider").addEventListener("input", update);
+                document.getElementById("tmin-slider").addEventListener("input", update);
+                document.getElementById("tmax-slider").addEventListener("input", update);
+                update();
+            })();
+        </script>
+    </table>
+
+    <table id="thresholds-output">
+        <tr>
+            <th>Digit (Decimal)</th>
+            <th>Threshold</th>
+            <th>Weight</th>
+            <th>Value</th>
+        </tr>
+    </table>
+    <script>
+        (() => {
+            function threshold(i, bias, tmin, tmax) {
+                return Math.min(tmax, Math.max(tmin, 36 * (i + 1) - bias));
+            }
+            function updateThresholds() {
+                let bias = parseInt(document.getElementById("bias-slider").value);
+                let tmin = parseInt(document.getElementById("tmin-slider").value);
+                let tmax = parseInt(document.getElementById("tmax-slider").value);
+                let number = parseInt(document.getElementById("number-input").value);
+                let table = document.getElementById("thresholds-output");
+                if (tmin >= tmax) {
+                    table.innerHTML = "<tr><td>tmin must be less than tmax!</td></tr>";
+                    return;
+                }
+                table.innerHTML = "<tr><th>Digit (Decimal)</th><th>Threshold</th><th>Weight</th><th>Value</th></tr>";
+                function addRow(digit_value, weight) {
+                    let digit = digit_value < 26 ? String.fromCharCode(97 + digit_value) : String.fromCharCode(22 + digit_value);
+                    let t = threshold(table.rows.length - 1, bias, tmin, tmax);
+                    let value = digit_value * weight;
+                    let threshold_calculation = `36 × (${table.rows.length - 1} + 1) - ${bias}<br/>= ${t}`;
+                    table.innerHTML += "<tr><td>" + digit + " (" + digit_value + ")</td><td>" + threshold_calculation + "</td><td>" + weight + "</td><td>" + value + "</td></tr>";
+                }
+                let weight = 1;
+                while (true) {
+                    let t = threshold(table.rows.length - 1, bias, tmin, tmax);
+                    if (number < t) {
+                        addRow(number, weight);
+                        break;
+                    }
+                    addRow(t + ((number - t) % (36 - tmin)), weight);
+                    number = Math.floor((number - t) / (36 - t));
+                    weight *= 36 - t;
+                }
+            }
+            document.getElementById("bias-slider").addEventListener("input", updateThresholds);
+            document.getElementById("tmin-slider").addEventListener("input", updateThresholds);
+            document.getElementById("tmax-slider").addEventListener("input", updateThresholds);
+            document.getElementById("number-input").addEventListener("input", updateThresholds);
+            updateThresholds();
+        })();
+    </script>
+
+    <h3>Choosing the bias</h3>
+
+    <p>
+        We're almost done! The last ingredient we need is the process of choosing the bias parameter for the threshold
+        function. In Punycode, the bias always starts off at 72 but the initial bias is a domain parameter of Bootstring
+        and can be set to any value. While decoding a basic string, the bias is then continuously adjusted to make sure
+        that the encoded numbers use as few digits as possible.
+    </p>
+
+    <p>
+        In <strong>bias adaption</strong> algorithm, we try to find a best guess for the value of the next delta in the
+        list. Assuming we have just decoded and applied a <code>delta</code> and have decoded <code>total</code>
+        codepoints, the bias for the next encoded delta is calculated as follows:
+
+    <ol>
+        <li>Divide <code>delta</code> by two (round down).</li>
+        <li>Add <code>delta / total</code> to <code>delta</code>.</li>
+        <li>Divide <code>delta</code> by <code>base - tmin</code> until it is no longer greater than
+            <code>((base - tmin) × tmax) / 2</code>. Count the number of divisions as <code>k</code>.</li>
+        <li>Set the bias to <code>(base × k) + (((base - tmin + 1) × delta) / (delta + skew))</code>. <code>skew</code>
+            is additional domain parameter of Bootstring and set to 38 in Punycode.</li>
+    </ol>
+
+    The first time the bias is calculated, <code>delta</code> is not divided by two but instead divided by yet another
+    domain parameter of Bootstring called <code>damp</code> which is set to 700 in Punycode.
+    </p>
+
+    <p>
+        Unfortunately, the bias adaption algorithm is complex and seems a bit arbitrary. I tried to find an intuitive
+        explanation for why it works but other than "it sets the bias so that the threshold is a good guess for the
+        number of digits needed to encode the next delta", I couldn't find anything. If you have an idea, let me know on <a href="https://infosec.exchange/@frereit">Mastodon</a> and I'll add or link to it here!
+    </p>
+
+    <h3>Putting it all together</h3>
+
+    <p>
+        We now, finally, have all the ingredients to decode a basic string given the following domain parameters:
+
+    <ul>
+        <li><code>delimeter</code>: The character that seperates the literal portion and the delta values, e.g. "-".</li>
+        <li><code>base</code>: The base of the generalized variable-length integers for the delta values, e.g. 36.  </li>
+        <li><code>initial_n</code>: The initial value for <code>n</code> in the state machine, e.g. 128.</li>
+        <li><code>initial_bias</code>: The initial value for the bias in the threshold function, e.g. 72.</li>
+        <li><code>tmin</code>: The minimum threshold in the threshold function, e.g. 1.</li>
+        <li><code>tmax</code>: The maximum threshold in the threshold function, e.g. 26.</li>
+        <li><code>damp</code>: The value to divide <code>delta</code> by the first time the bias is adapted, e.g. 700.</li>
+        <li><code>skew</code>: The value to add to the bias when it is adapted, e.g. 38.</li>
+    </ul>
+
+        Let's look at the high level steps again:
+
+    <ol>
+        <li>Split the basic string into the literal portion and the delta values</li>
+        <li>Initialise a state machine pointing at the currently decoded string, the literal portion.</li>
+        <li>Decode the first delta value using the thresholds generated from <code>initial_bias</code></li>
+        <li>Advance the state machine by <code>delta</code> steps and insert the current code point at the current
+            position in the extended string</li>
+        <li>Choose the new bias using the bias adaption algorithm</li>
+        <li>Repeat steps 3-5 until all delta values have been decoded</li>
+    </ol>
+    </p>
+
+    <p>So, as a last example, let's decode the basic string "-is-awesome-pu76jbyx"! We start off by decoding the first
+        delta value using the thresholds generated from <code>initial_bias=72</code>:
+    </p>
+    <table id="thresholds-output-2">
+        <tr>
+            <th>Digit (Decimal)</th>
+            <th>Threshold</th>
+            <th>Weight</th>
+            <th>Value</th>
+        </tr>
+        <tr>
+            <td>p (15)</td>
+            <td>1</td>
+            <td>1</td>
+            <td>15</td>
+        </tr>
+        <tr>
+            <td>u (20)</td>
+            <td>1</td>
+            <td>35</td>
+            <td>700</td>
+        </tr>
+        <tr>
+            <td>7 (33)</td>
+            <td>26</td>
+            <td>1225</td>
+            <td>40425</td>
+        </tr>
+        <tr>
+            <td>6 (32)</td>
+            <td>26</td>
+            <td>12250</td>
+            <td>392000</td>
+        </tr>
+        <tr>
+            <td>j (9)</td>
+            <td>26</td>
+            <td>122500</td>
+            <td>1102500</td>
+        </tr>
+    </table>
+
+    <p>
+        So, the first <code>delta</code> value is <code>1535640</code>, leaving the string "byx" leftover for other
+        delta values. Let's see what that does to the state machine:
+    </p>
+
+    <div class="highlight">
+        <pre
+            id="state-machine-3"><noscript>Unfortunately, this demo only works with JavaScript enabled.</noscript></pre>
+    </div>
+    <button id="next-3">Advance 1535640 states</button>
+    <button id="reset-3">Reset</button>
+    <script>
+        (() => {
+            let stateMachine = document.getElementById("state-machine-3");
+            let nextButton = document.getElementById("next-3");
+            let resetButton = document.getElementById("reset-3");
+            let i = 0;
+            let n = 128;
+            let num_steps = 0;
+            let total_steps = 1535640;
+            let advance_loop = 0;
+            let string = "-is-awesome";
+            function render() {
+                let text = "";
+                for (const codePoint of string) {
+                    text += " " + codePoint;
+                }
+                text += "\n";
+                let padding = " ".repeat(2 * i);
+                let arrow = padding + "↑\n";
+                let state = padding + "i=" + i + "\n" + padding + "n=" + n;
+                stateMachine.textContent = text + arrow + state;
+            }
+            function advance() {
+                if (num_steps < total_steps) {
+                    i = (i + 1) % (string.length + 1);
+                    if (i === 0) {
+                        n++;
+                    }
+                    num_steps++;
+                    render();
+                    if (num_steps > 200) {
+                        cancelAnimationFrame(advance_loop);
+                        clearTimeout(advance_loop);
+                        let steps_left = total_steps - num_steps;
+                        n += Math.floor((i + steps_left) / (string.length + 1));
+                        i = (i + steps_left) % (string.length + 1);
+                        num_steps = total_steps;
+                        render();
+                        requestAnimationFrame(advance);
+                    }
+                    else if (num_steps > 50) {
+                        advance_loop = requestAnimationFrame(advance);
+                    } else if (num_steps > 30) {
+                        advance_loop = setTimeout(advance, 50);
+                    } else {
+                        advance_loop = setTimeout(advance, 100);
+                    }
+                } else {
+                    nextButton.removeAttribute("disabled");
+                    cancelAnimationFrame(advance_loop);
+                    clearTimeout(advance_loop);
+                    nextButton.innerText = "Insert code point";
+                }
+            }
+            nextButton.addEventListener("click", function () {
+                if (num_steps == 0) {
+                    advance();
+                    nextButton.setAttribute("disabled", "disabled");
+                } else {
+                    string = string.slice(0, i) + String.fromCodePoint(n) + string.slice(i);
+                    nextButton.setAttribute("disabled", "disabled");
+                    i = (i + 1) % (string.length + 1);
+                    if (i === 0) {
+                        n++;
+                    }
+                    num_steps++;
+                    render();
+                }
+            });
+            resetButton.addEventListener("click", function () {
+                cancelAnimationFrame(advance_loop);
+                clearTimeout(advance_loop);
+                nextButton.removeAttribute("disabled");
+                nextButton.innerText = `Advance ${total_steps} states`;
+                string = "-is-awesome";
+                num_steps = 0;
+                i = 0;
+                n = 128;
+                render();
+            });
+            render();
+        })();
+    </script>
+
+    <p>
+        Great, we have advanced the state machine by 1535640 steps and inserted the "👢" character at the beginning of
+        the extended string! The next step is to adapt the bias before we can decode the next delta. Remember,
+        <code>total = 12</code> because the length of the extended string so far is 12 and we're adapting the bias for
+        the first time, so we divide by <code>damp = 700</code> instead of two.
+
+    <ol>
+        <li>Divide <code>delta</code> by <code>damp</code>: <code>delta = 1535640 / 700 = 2193</code>.</li>
+        <li>Add <code>delta / total</code> to <code>delta</code>: <code>delta = 2193 + 2193 / 12 = 2375</code>.</li>
+        <li>Divide <code>delta</code> by <code>base - tmin</code> until it is no longer greater than
+            <code>((base - tmin) × tmax) / 2</code>. Count the number of divisions as <code>k</code>: We divide once, so
+            <code>k = 1</code> and <code>delta = 2375 / (36 - 1) = 67</code></li>
+        <li>Set the bias to <code>(base × k) + (((base - tmin + 1) × delta) / (delta + skew))</code>:
+            <code>(36 × 1) + (((36 - 1 + 1) × 67) / (67 + 38)) = 58</code>.</li>
+    </ol>
+    </p>
+
+    <p>
+        Okay, we have our new bias, <code>58</code>, and we can now decode the next delta value using the thresholds
+        generated from <code>bias=58</code>:
+    </p>
+
+    <table>
+        <tr>
+            <th>Digit (Decimal)</th>
+            <th>Threshold</th>
+            <th>Weight</th>
+            <th>Value</th>
+        </tr>
+        <tr>
+            <td>b (1)</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+        </tr>
+        <tr>
+            <td>y (24)</td>
+            <td>14</td>
+            <td>35</td>
+            <td>840</td>
+        </tr>
+        <tr>
+            <td>x (23)</td>
+            <td>26</td>
+            <td>770</td>
+            <td>17710</td>
+        </tr>
+        </tr>
+    </table>
+
+    <p>
+        Our next, and last, <code>delta</code> value is <code>18551</code>. So, as the last step in decoding the basic string, we advance the state machine once again by <code>18551</code> steps:
+    </p>
+
+    <div class="highlight">
+        <pre
+            id="state-machine-4"><noscript>Unfortunately, this demo only works with JavaScript enabled.</noscript></pre>
+    </div>
+    <button id="next-4">Advance 18551 states</button>
+    <button id="reset-4">Reset</button>
+    <script>
+        (() => {
+            let stateMachine = document.getElementById("state-machine-4");
+            let nextButton = document.getElementById("next-4");
+            let resetButton = document.getElementById("reset-4");
+            let i = 1;
+            let n = 128098;
+            let num_steps = 0;
+            let total_steps = 18551;
+            let advance_loop = 0;
+            let string = "👢-is-awesome";
+            function render() {
+                let text = "";
+                for (const codePoint of string) {
+                    text += " " + codePoint;
+                }
+                text += "\n";
+                let padding = " ".repeat(2 * i);
+                let arrow = padding + "↑\n";
+                let state = padding + "i=" + i + "\n" + padding + "n=" + n;
+                stateMachine.textContent = text + arrow + state;
+            }
+            function advance() {
+                if (num_steps < total_steps) {
+                    i = (i + 1) % (string.length /* + 1 */);
+                    if (i === 0) {
+                        n++;
+                    }
+                    num_steps++;
+                    render();
+                    if (num_steps > 200) {
+                        cancelAnimationFrame(advance_loop);
+                        clearTimeout(advance_loop);
+                        let steps_left = total_steps - num_steps;
+                        n += Math.floor((i + steps_left) / (string.length /* + 1 emoji counts for 2...*/));
+                        i = (i + steps_left) % (string.length /* + 1 */ );
+                        num_steps = total_steps;
+                        render();
+                        requestAnimationFrame(advance);
+                    }
+                    else if (num_steps > 50) {
+                        advance_loop = requestAnimationFrame(advance);
+                    } else if (num_steps > 30) {
+                        advance_loop = setTimeout(advance, 50);
+                    } else {
+                        advance_loop = setTimeout(advance, 100);
+                    }
+                } else {
+                    nextButton.removeAttribute("disabled");
+                    cancelAnimationFrame(advance_loop);
+                    clearTimeout(advance_loop);
+                    nextButton.innerText = "Insert code point";
+                }
+            }
+            nextButton.addEventListener("click", function () {
+                if (num_steps == 0) {
+                    advance();
+                    nextButton.setAttribute("disabled", "disabled");
+                } else {
+                    string = string.slice(0, i + 1) + String.fromCodePoint(n) + string.slice(i + 1);
+                    nextButton.setAttribute("disabled", "disabled");
+                    i = (i + 1) % (string.length /* + 1 */);
+                    if (i === 0) {
+                        n++;
+                    }
+                    num_steps++;
+                    render();
+                }
+            });
+            resetButton.addEventListener("click", function () {
+                cancelAnimationFrame(advance_loop);
+                clearTimeout(advance_loop);
+                nextButton.removeAttribute("disabled");
+                nextButton.innerText = `Advance ${total_steps} states`;
+                string = "👢-is-awesome";
+                num_steps = 0;
+                i = 1;
+                n = 128098;
+                render();
+            });
+            render();
+        })();
+    </script>
+
+    <p>
+        And there we have it! The fully extended string "👢🧵-is-awesome"!
+    </p>
+
+    <h2>Conclusion</h2>
+
+    <p>
+        Bootstring is a clever algorithm that allows us to encode any sequence of Unicode code points into a string that consists of only ASCII characters. Bootstring is heavily parameterized so it can theoretically be adapted to many different use cases. However, in practice, it is mostly used in the context of domain names.
+    </p>
+    
+    <p>
+        In this article, we looked at the basic state machine that powers Bootstring, and learned how to apply it to decode a basic string. We also looked at how generalized variable-length integers work and how to calculate the thresholds. Finally, we looked at how to adapt the bias and how to put it all together to decode a basic string. In Part 2, we will look at how to encode a string using Bootstring<sup class="footnote-reference"><a id="footnote-reference-3" href="#footnote-3">3</a></sup>.
+    </p>
+
+    <p>
+        Thank you for reading! If you have any questions or feedback, feel free to send me a toot: <a href="https://infosec.exchange/@frereit">@fre@infosec.exchange</a>.
+    </p>
+
+    <h2>Footnotes</h2>
+    <div class="footnotes">
+        <div class="footnote-definitions">
+            <div class="footnote-definition">
+                <sup id="footnote-1"><a href="#footnote-reference-1">1</a></sup>
+                <div class="footnote-body">
+                    If you've never heard of code points, don't worry. They are just numbers that represent characters
+                    in a text. For example, the code point for the letter "A" is 65.
+                </div>
+            </div>
+            <div class="footnote-definition">
+                <sup id="footnote-2"><a href="#footnote-reference-2">2</a></sup>
+                <div class="footnote-body">
+                    Of course, we could use a higher base than 10 to encode the numbers, for example base 36. This would
+                    allow us to use the characters a-z and 0-9 and save some space. However, this is still not as space
+                    efficient as generalized variable-length integers.
+                </div>
+            </div>
+            <div class="footnote-definition">
+                <sup id="footnote-3"><a href="#footnote-reference-3">3</a></sup>
+                <div class="footnote-body">
+                    Spoiler Alert: Essentially, we just order the non-basic code points by value, find the insertion point of the next code point in the extended string, and encode the delta between the insertion point and the last insertion point.
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
