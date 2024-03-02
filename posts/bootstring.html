@@ -46,8 +46,8 @@
         At the heart of Bootstring lies a simple state machine that consists of two variables:
     </p>
     <ul>
-        <li><strong><code>n</code></strong>: The current code point that should be inserted.</li>
-        <li><strong><code>i</code></strong>: The position in the current string where it will be inserted.</li>
+        <li><code>n</code>: The current code point that should be inserted.</li>
+        <li><code>i</code>: The position in the current string where it will be inserted.</li>
     </ul>
     <p>
         Bootstring, when decoding a basic string, iterates through this state machine and inserts the code point
@@ -274,7 +274,7 @@
         Again, I think it's best explained using an example. Let's try to decode the mysterios "3ya" string from before.
         Its digits are in base 36 and for now, we assume the thresholds are <code>[1, 1, 26]</code>. We start off by
         writing each digit of the number into the table below, along with the threshold for that position. Then, we
-        calculate the weight and the value of each digit by multiplying the weight with the digit and the threshold.
+        calculate the weight based on the thresholds and the value of each digit by multiplying the weight with the digit.
         Finally, we add up the values to get the final number.
     </p>
     <p>
