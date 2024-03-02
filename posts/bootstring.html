@@ -108,11 +108,11 @@
     <h2>Producing an extended string</h2>
     <p>
         A basic string is simply a recipe for how to advance the state machine to produce the extended string. It is
-        composed of an optional <strong>literal portion</strong> with a delimeter and a set of <strong>delta
+        composed of an optional <strong>literal portion</strong> with a delimiter and a set of <strong>delta
             values</strong>. The literal portion is copied verbatim to the extended string, while the delta values are
-        used to advance the state machine. The delimeter is used to separate the literal portion from the delta values.
+        used to advance the state machine. The delimiter is used to separate the literal portion from the delta values.
         For example, the basic string "Mnchen-3ya" has the literal portion "Mnchen" and the delta values "3ya". What
-        delimeter is used is a domain parameter of Bootstring and is set to "-" in Punycode.
+        delimiter is used is a domain parameter of Bootstring and is set to "-" in Punycode.
     </p>
     </p>
     Although seemingly just a string, the delta values are actually a sequence of numbers. In the case of
@@ -238,7 +238,7 @@
     </p>
     <p>
         Let's say we want to encode the delta values <code>[869, 13, 37]</code> as a string. One way to do this would be
-        to write the numbers simply concatenated with some delimeter, "869-13-37". If we want to avoid using delimiters
+        to write the numbers simply concatenated with some delimiter, "869-13-37". If we want to avoid using delimiters
         we have to use fixed length integers, for example by padding the numbers with zeros, "086900130037"<sup
             class="footnote-reference"><a id="footnote-reference-2" href="#footnote-2">2</a></sup>. In both cases, we
         can quite trivially decode the string back to the list of numbers. However, this is not very space efficient.
@@ -447,7 +447,7 @@
         We now, finally, have all the ingredients to decode a basic string given the following domain parameters:
 
     <ul>
-        <li><code>delimeter</code>: The character that seperates the literal portion and the delta values, e.g. "-".</li>
+        <li><code>delimiter</code>: The character that seperates the literal portion and the delta values, e.g. "-".</li>
         <li><code>base</code>: The base of the generalized variable-length integers for the delta values, e.g. 36.  </li>
         <li><code>initial_n</code>: The initial value for <code>n</code> in the state machine, e.g. 128.</li>
         <li><code>initial_bias</code>: The initial value for the bias in the threshold function, e.g. 72.</li>
