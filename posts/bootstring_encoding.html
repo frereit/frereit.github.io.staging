@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Bootstring Encoding | frereit's blog</title>
+    <link rel="stylesheet" type="text/css" href="/blog.css">
+    <meta name="description" content="Bootstring is an encoding for Unicode strings. How does it work?">
+    <meta name="keywords" content="bootstring, unicode, encoding, punycode">
+    <meta name="author" content="frereit">
+    <script src="js/bootstring.js"></script>
+</head>
+
+<body>
+    <header>
+        <a class="logo" href="/">Home</a>
+        <nav>
+            <a rel="me" href="https://github.com/frereit">GitHub</a>
+            <a rel="me" href="https://infosec.exchange/@fre">Mastodon</a>
+        </nav>
+    </header>
+    <h1>Bootstring Part 2: Encoding</h1>
+
+    <h2>Recap</h2>
+    <p>
+        In the <a href="bootstring_decoding.html">previous post</a>, we discussed how to decode a Bootstring string. If
+        you haven't read it yet, I recommend you do so before continuing. This post will just quickly go over how encoding works to complete the picture. I'll skip over the details of the generalized variable-length integers that we already discussed in the previous post.
+    </p>
+
+    <p>
+        We already saw how we can use the state machine to decode a Bootstring basic string. We will now discuss how to
+        take any extended string and encode it to a basic string. As a reminder, let's look at how the state machine
+        works. It consists of two variables <code>n</code> and <code>i</code> and always advances by incrementing
+        <code>i</code>. When <code>i</code> reaches the end of the string, <code>n</code> is incremented and
+        <code>i</code> is reset to 0. In Punycode, the state machine is initialized with <code>n = 128</code> and
+        <code>i = 0</code>.
+    </p>
+
+    <p id="state-machine-1">
+        <noscript>Unfortunately, this demo only works with JavaScript enabled.</noscript>
+    </p>
+    <button id="next-1">Next state</button>
+    <button id="reset-1">Reset</button>
+    <script>
+        (() => {
+            let stateMachine = createStateMachine(document.getElementById("state-machine-1"), "bootstring", 128, 0, 0);
+            let nextButton = document.getElementById("next-1");
+            let resetButton = document.getElementById("reset-1");
+            nextButton.addEventListener("click", function () {
+                stateMachine.step(1);
+            });
+            resetButton.addEventListener("click", function () {
+                stateMachine.reset();
+            });
+        })();
+    </script>
+    </p>
+
+    <p>
+        At every step in the state machine, we can optionally choose to insert the current character represented by
+        <code>n</code> into the output string at position <code>i</code>. The basic string then tells the decoder at
+        which steps to insert the character. So, to encode an extended string, our task is to find a set of insertion
+        points that will result in a basic string that can be decoded to the original extended string.
+    </p>
+
+    <h2>Splitting the extended string</h2>
+
+    <p>
+        As you might recall, the basic string always consists of an optional <strong>literal portion</strong> and a set
+        of <strong>delta values</strong>. The literal portion is the initial string used in the state machine and
+        consists of all the code points that are part of the basic code point set. In this article, we'll try to encode the string "ciência da computação", so the first
+        step is to filter out all characters that are part of the basic code point set:
+    </p>
+
+    <p>
+    <table>
+        <tr>
+            <th>Extended string</th>
+            <th>Literal portion</th>
+        </tr>
+        <tr>
+            <td>ciência da computação</td>
+            <td>cincia da computao</td>
+        </tr>
+    </table>
+    </p>
+
+    <h2>Inserting the code points</h2>
+
+    <p>
+        Okay, we now have the literal portion that will be used to initialize the state machine. The next step is to
+        find the delta values. Because the state machine can only ever increment <code>n</code> and <code>n</code>
+        represents the code point we want to insert, it is hopefully clear that we must insert the code points in
+        increasing order because we can never go back to lower values of <code>n</code>. As a first step, let's sort the code points in the extended string that are not part of the
+        basic code point set by value and position:
+    </p>
+
+    <p>
+    <table>
+        <tbody>
+            <tr>
+                <th>Code Point</th>
+                <th>Value</th>
+                <th>Position</th>
+            </tr>
+            <tr>
+                <td>ã</td>
+                <td>227</td>
+                <td>19</td>
+            </tr>
+            <tr>
+                <td>ç</td>
+                <td>231</td>
+                <td>18</td>
+            </tr>
+            <tr>
+                <td>ê</td>
+                <td>234</td>
+                <td>2</td>
+            </tr>
+        </tbody>
+    </table>
+    </p>
+
+    <p>
+        This table shows us the order in which we need to insert the code points into the literal portion using the
+        state machine. Let's try to find the first delta value by advancing the state machine until
+        <code>n = 227</code> so that we can insert ã into the string. Intuitively, we need to insert the code point at
+        position 19 but remember that at this point, the state machine still only contains the
+        literal portion, so all characters from the extended string are missing. Therefore, we have to subtract the
+        number of extended code points missing from the string that appear before the insertion point. In this case, we
+        have to subtract 2 from the insertion point because we have not yet inserted the characters ç and ê, so we need
+        to insert ã at position <code>i = 17</code>.
+        Let's see how this works:
+    </p>
+
+    <p id="state-machine-2">
+        <noscript>Unfortunately, this demo only works with JavaScript enabled.</noscript>
+    </p>
+    <button id="next-2">Advance unil n = 227 and i = 17</button>
+    <button id="reset-2">Reset</button>
+    <script>
+        (() => {
+            let stateMachine = createStateMachine(document.getElementById("state-machine-2"), "cincia da computao", 128, 0, 0);
+            let nextButton = document.getElementById("next-2");
+            let resetButton = document.getElementById("reset-2");
+            nextButton.addEventListener("click", function () {
+                if (stateMachine.state.step == 0) {
+                    let num_steps = 1898;
+                    stateMachine.stepAnimate(num_steps, () => {
+                        nextButton.removeAttribute("disabled");
+                        nextButton.textContent = "Insert code point";
+                    });
+                    nextButton.setAttribute("disabled", "disabled");
+                } else {
+                    stateMachine.stepAndInsert();
+                    nextButton.setAttribute("disabled", "disabled");
+                }
+            });
+            resetButton.addEventListener("click", function () {
+                nextButton.removeAttribute("disabled");
+                nextButton.textContent = "Advance unil n = 227 and i = 17";
+                stateMachine.reset();
+            });
+        })();
+    </script>
+
+    <p>
+        As you can see, we have inserted the first code point at positon 17 after advancing the state machine
+        <code>1898</code> steps. Because this is the first insertion, the corresponding delta value is also
+        <code>1898</code>. For the next code point ç, we need <code>n = 231</code> and <code>i = 18 - 1 = 17</code>. For
+        the last code point ê, we need <code>n = 234</code> and <code>i = 2</code>. Let's run the state machine until
+        those conditions are met and note down the absolute number of steps at which we should insert the code points:
+    </p>
+
+    <p id="state-machine-3">
+        <noscript>Unfortunately, this demo only works with JavaScript enabled.</noscript>
+    </p>
+    <button id="next-3">Advance unil n = 234 and i = 2</button>
+    <button id="reset-3">Reset</button>
+    <script>
+        (() => {
+            let stateMachine = createStateMachine(document.getElementById("state-machine-3"), "cincia da computaão", 227, 18, 1899);
+            let nextButton = document.getElementById("next-3");
+            let resetButton = document.getElementById("reset-3");
+            nextButton.addEventListener("click", function () {
+                if (stateMachine.state.step == 1899) {
+                    // Advance until n = 231 and i = 17
+                    stateMachine.stepAnimate(79, () => {
+                        nextButton.removeAttribute("disabled");
+                        nextButton.textContent = "Insert code point";
+                    });
+                    nextButton.setAttribute("disabled", "disabled");
+                } else if (stateMachine.state.step == 1978) {
+                    stateMachine.stepAndInsert();
+                    nextButton.textContent = "Advanced until n = 234 and i = 2";
+                } else if (stateMachine.state.step == 1979) {
+                    // Advance until n = 234 and i = 2
+                    stateMachine.stepAnimate(47, () => {
+                        nextButton.removeAttribute("disabled");
+                        nextButton.textContent = "Insert code point";
+                    });
+                    nextButton.setAttribute("disabled", "disabled");
+                } else {
+                    stateMachine.stepAndInsert();
+                    nextButton.setAttribute("disabled", "disabled");
+                }
+            });
+            resetButton.addEventListener("click", function () {
+                nextButton.removeAttribute("disabled");
+                nextButton.textContent = "Advance unil n = 234 and i = 2";
+                stateMachine.reset();
+            });
+        })();
+    </script>
+
+    <p>
+        Noting the positions at which we inserted the code points, we now know that we have to perform insertions at
+        1898, 1978, and 2026. This means that the delta values should be
+        <code>[1898, 1978 - 1899, 2026 - 1979] = [1898, 79, 47]</code>. The last step is to encode the delta values
+        using generalized variable-length integers and append them to the literal portion.
+    </p>
+
+    <h2>Encoding the delta values</h2>
+
+    <p>
+        I already went over how generalized variable-length integers work in the <a
+            href="bootstring_decoding.html">previous post</a>, so I won't repeat myself here. The delta values we found
+        are <code>[1898, 79, 47]</code>. The first delta will be encoded with the default value for <code>bias</code>, which is 72 in Punycode:
+    </p>
+
+    <table>
+        <tbody>
+            <tr>
+                <th>Digit (Decimal)</th>
+                <th>Threshold</th>
+                <th>Weight</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>i (8)</td>
+                <td>1</td>
+                <td>1</td>
+                <td>8</td>
+            </tr>
+            <tr>
+                <td>t (19)</td>
+                <td>1</td>
+                <td>35</td>
+                <td>665</td>
+            </tr>
+            <tr>
+
+                <td>b (1)</td>
+                <td>26</td>
+                <td>1225</td>
+                <td>1225</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>
+        The first delta value 1898 is encoded as "itb". Performing the bias adaption algorithm yields a new bias value:
+    </p>
+
+    <ol>
+        <li>Divide <code>delta</code> by <code>damp</code>: <code>delta = 1898 / 700 = 2</code>.</li>
+        <li>Add <code>delta / total</code> to <code>delta</code>: <code>delta = 2 + 2 / 19 = 2</code>.</li>
+        <li>Divide <code>delta</code> by <code>base - tmin</code> until it is no longer greater than
+            <code>((base - tmin) × tmax) / 2</code>. Count the number of divisions as <code>k</code>: <code>delta</code>
+            is already less than <code>445</code>, so <code>k = 0</code>.
+        </li>
+        <li>Set the bias to <code>(base × k) + (((base - tmin + 1) × delta) / (delta + skew))</code>:
+            <code>(36 × 0) + (((36 - 1 + 1) × 2) / (2 + 38)) = 1</code>.
+        </li>
+    </ol>
+
+    <p>
+        Using the new bias value of 1, we can encode the next delta value 79:
+    </p>
+
+    <table>
+        <tbody>
+            <tr>
+                <th>Digit (Decimal)</th>
+                <th>Threshold</th>
+                <th>Weight</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>3 (29)</td>
+                <td>26</td>
+                <td>1</td>
+                <td>29</td>
+            </tr>
+            <tr>
+                <td>f (5)</td>
+                <td>26</td>
+                <td>10</td>
+                <td>50</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>
+        The second delta value 79 is encoded as "3f". I'll spare you the details of the bias adaption algorithm for the
+        second time, but following the same steps as before, we find that the new bias is 18 and can use that to encode
+        the last delta value 47:
+    </p>
+
+    <table>
+        <tbody>
+            <tr>
+                <th>Digit (Decimal)</th>
+                <th>Threshold</th>
+                <th>Weight</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>3 (29)</td>
+                <td>18</td>
+                <td>1</td>
+                <td>29</td>
+            </tr>
+            <tr>
+                <td>b (1)</td>
+                <td>26</td>
+                <td>18</td>
+                <td>18</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>
+        We have now encoded the delta values <code>[1898, 79, 47]</code> as "itb3f3b". We just need to join this with the basic string and we have our Bootstring basic string: <strong>cincia da computao-itb3f3b</strong>!
+    </p>
+
+    <h2>Conclusion</h2>
+
+    <p>
+        So there you have it, we have successfully encoded the extended string "ciência da computação" to a Bootstring basic string. In practice, it is not necessary to simulate the entire state machine, we can just calculate the number of steps required to insert a code point at a given position. If you're curious, check out the <a href="https://tools.ietf.org/html/rfc3492">RFC 3492</a> for pseudocode and a more detailed explanation of the algorithm, or check out <a href="https://github.com/frereit/bootstring">my implementation</a> on GitHub.
+    </p>
+
+    <p>
+        Thank you for reading this article. If you have any questions or feedback, feel free to reach out to me on <a href="https://infosec.exchange/@fre">Mastodon</a>!
+    </p>
+</body>
+
+</html>
