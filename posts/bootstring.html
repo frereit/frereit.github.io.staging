@@ -389,6 +389,7 @@
                     table.innerHTML += "<tr><td>" + digit + " (" + digit_value + ")</td><td>" + threshold_calculation + "</td><td>" + weight + "</td><td>" + value + "</td></tr>";
                 }
                 let weight = 1;
+                let its = 0;
                 while (true) {
                     let t = threshold(table.rows.length - 1, bias, tmin, tmax);
                     if (number < t) {
@@ -398,6 +399,11 @@
                     addRow(t + ((number - t) % (36 - tmin)), weight);
                     number = Math.floor((number - t) / (36 - t));
                     weight *= 36 - t;
+                    its++;
+                    if (its > 50) {
+                        document.getElementById("thresholds-output").innerHTML = "<tr><td>Failed to encode the number in less than 50 digits. Try a smaller number or adjusting the thresholds.</td></tr>";
+                        break;
+                    }
                 }
             }
             document.getElementById("bias-slider").addEventListener("input", updateThresholds);
