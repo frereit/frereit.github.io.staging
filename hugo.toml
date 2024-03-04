@@ -1,0 +1,55 @@
+baseURL = "https://frereit.de/"
+theme = "simple"
+languageCode = "en"
+title = "frereit's blog"
+copyright = "CC BY-SA 4.0 frereit"
+
+enableRobotsTXT = true
+capitalizeListTitles = false
+
+disableKinds = ["taxonomy"]
+[taxonomies]
+tag = "tags"
+
+[permalinks]
+blog = "/:slugorfilename/"
+tags = "/blog/:slug"
+
+[markup.goldmark.renderer]
+unsafe = true
+[markup.tableOfContents]
+startLevel = 2
+endLevel = 3
+[markup.highlight]
+lineNos = true
+lineNumbersInTable = false
+noClasses = true
+style = "catppuccin-mocha"
+
+[params]
+title = "frereit's blog"
+description = "Personal blog about computer science, cyber security and anything else that I find interesting."
+favicon = "img/favicon-32x32.png"
+dateFormat = "2006-01-02"
+hideMadeWithLine = true
+
+[params.author]
+name = "Frederik Reiter"
+email = "hi@frereit.de"
+
+[[menu.main]]
+name = "Home"
+pageRef = "/"
+weight = 10
+[[menu.main]]
+name = "Blog"
+pageRef = "/blog"
+weight = 20
+
+[services.rss]
+limit = 50
+
+[outputs]
+section = ["html"]
+taxonomy = ["html"]
+term = ["html"]
