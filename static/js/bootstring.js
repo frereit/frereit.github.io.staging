@@ -8,12 +8,8 @@ function createStateMachine(container, initial_string, initial_n, initial_i, ini
     if (typeof initial_i !== "number") {
         throw new Error("initial_i has to be a number");
     }
-    let root = document.createElement("div");
-    root.classList.add("highlight");
-    container.innerHTML = "";
-    container.appendChild(root);
     let pre = document.createElement("pre");
-    root.appendChild(pre);
+    container.appendChild(pre);
 
     let state = {
         n: initial_n,
@@ -65,7 +61,19 @@ function createStateMachine(container, initial_string, initial_n, initial_i, ini
         stepInner();
     }
     function stepAndInsert() {
-        state.string = state.string.slice(0, state.i) + String.fromCodePoint(state.n) + state.string.slice(state.i);
+        let next_string = "";
+        let cp = 0;
+        for (const codePoint of state.string) {
+            if (cp == state.i) {
+                next_string += String.fromCodePoint(state.n);
+            }
+            next_string += codePoint;
+            cp++;
+        }
+        if (cp == state.i) {
+            next_string += String.fromCodePoint(state.n);
+        }
+        state.string = next_string;
         step(1);
     }
     function reset() {
