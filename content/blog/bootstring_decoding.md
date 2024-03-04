@@ -356,7 +356,7 @@ And there we have it! The fully extended string "👢🧵-is-awesome"!
 
  Bootstring is a clever algorithm that allows us to encode any sequence of Unicode code points into a string that consists of only ASCII characters. Bootstring is heavily parameterized so it can theoretically be adapted to many different use cases. However, in practice, it is mostly used in the context of domain names.
 
-In this article, we looked at the basic state machine that powers Bootstring, and learned how to apply it to decode a basic string. We also looked at how generalized variable-length integers work and how to calculate the thresholds. Finally, we looked at how to adapt the bias and how to put it all together to decode a basic string. In [Part 2](/blog/bootstring_encoding), we quickly take a look at how to encode a string using Bootstring[^3].
+In this article, we looked at the basic state machine that powers Bootstring, and learned how to apply it to decode a basic string. We also looked at how generalized variable-length integers work and how to calculate the thresholds. Finally, we looked at how to adapt the bias and how to put it all together to decode a basic string. In [Part 2](/bootstring_encoding), we quickly take a look at how to encode a string using Bootstring[^3].
 
 [^3]: Spoiler Alert: Essentially, we just order the non-basic code points by value, find the insertion point of the next code point in the extended string, and encode the delta between the insertion point and the last insertion point. 
 

@@ -9,7 +9,7 @@ tags:
 ---
 <script src="/js/bootstring.js"></script>
 
-In the [previous post](/blog/bootstring_decoding), we discussed how to decode a Bootstring string. If you haven't read it yet, I recommend you do so before continuing. This post will just quickly go over how encoding works to complete the picture. I'll skip over the details of the generalized variable-length integers that we already discussed in the previous post.
+In the [previous post](/bootstring_decoding), we discussed how to decode a Bootstring string. If you haven't read it yet, I recommend you do so before continuing. This post will just quickly go over how encoding works to complete the picture. I'll skip over the details of the generalized variable-length integers that we already discussed in the previous post.
 
 ## Recap
 
@@ -136,7 +136,7 @@ Noting the positions at which we inserted the code points, we now know that we h
 
 ## Encoding the delta values
 
-I already went over how generalized variable-length integers work in the [previous post](/blog/bootstring_decoding), so I won't repeat myself here. The delta values we found are `[1898, 79, 47]`. The first delta will be encoded with the default value for bias, which is 72 in Punycode:
+I already went over how generalized variable-length integers work in the [previous post](/bootstring_decoding), so I won't repeat myself here. The delta values we found are `[1898, 79, 47]`. The first delta will be encoded with the default value for bias, which is 72 in Punycode:
 
 | Digit (Decimal) | Threshold Weight | Value |
 | ---------------- | ----------------- | ----- |
