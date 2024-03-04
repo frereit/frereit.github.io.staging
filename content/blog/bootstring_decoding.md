@@ -9,7 +9,7 @@ tags:
 ---
 <script src="/js/bootstring.js"></script>
 
-You may know about [Punycode](https://en.wikipedia.org/wiki/Punycode), a way to represent Unicode strings with only ASCII characters. It is used to encode domain names, for example "münchen.de" becomes "xn--mnchen-3ya.de". Punycode, specified in [RFC 3492](https://tools.ietf.org/html/rfc3492), is technically just a set of parameters for a more general algorithm called Bootstring, which is specified in the same document. In this post, I will explain how Bootstring works and how to use it to decode an encoded string. 
+You may know about [Punycode](https://en.wikipedia.org/wiki/Punycode), a way to represent Unicode strings with only ASCII characters. It is used to encode domain names, for example "münchen.de" becomes "xn\--mnchen-3ya.de". Punycode, specified in [RFC 3492](https://tools.ietf.org/html/rfc3492), is technically just a set of parameters for a more general algorithm called Bootstring, which is specified in the same document. In this post, I will explain how Bootstring works and how to use it to decode an encoded string. 
 
 ## The Basics
 
