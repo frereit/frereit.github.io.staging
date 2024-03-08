@@ -59,7 +59,7 @@ This table shows us the order in which we need to insert the code points into th
 <p id="state-machine-2">
     <noscript>Unfortunately, this demo only works with JavaScript enabled.</noscript>
 </p>
-<button id="next-2">Advance unil n = 227 and i = 17</button>
+<button id="next-2">Advance until n = 227 and i = 17</button>
 <button id="reset-2">Reset</button>
 <script>
     (() => {
@@ -81,7 +81,7 @@ This table shows us the order in which we need to insert the code points into th
         });
         resetButton.addEventListener("click", function () {
             nextButton.removeAttribute("disabled");
-            nextButton.textContent = "Advance unil n = 227 and i = 17";
+            nextButton.textContent = "Advance until n = 227 and i = 17";
             stateMachine.reset();
         });
     })();
@@ -92,7 +92,7 @@ As you can see, we have inserted the first code point at positon 17 after advanc
 <p id="state-machine-3">
     <noscript>Unfortunately, this demo only works with JavaScript enabled.</noscript>
 </p>
-<button id="next-3">Advance unil n = 234 and i = 2</button>
+<button id="next-3">Advance until n = 234 and i = 2</button>
 <button id="reset-3">Reset</button>
 <script>
     (() => {
@@ -124,7 +124,7 @@ As you can see, we have inserted the first code point at positon 17 after advanc
         });
         resetButton.addEventListener("click", function () {
             nextButton.removeAttribute("disabled");
-            nextButton.textContent = "Advance unil n = 234 and i = 2";
+            nextButton.textContent = "Advance until n = 234 and i = 2";
             stateMachine.reset();
         });
     })();
