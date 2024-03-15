@@ -13,3 +13,26 @@ table tr {
 .badge img {
     height: 2em;
 }
+
+.activate-windows {
+    position: fixed;
+    bottom: 40px;
+    right: 38px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.15em;
+    opacity: 0.5;
+}
+
+.activate-windows .title {
+    font-size: 15.75pt;
+}
+
+.activate-windows .subtitle {
+    font-size: 12pt;
+}
+
+@media (max-width: 1337px) {
+    .activate-windows {
+        display: none;
+    }
+}
