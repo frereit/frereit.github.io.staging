@@ -4,3 +4,12 @@ table tr {
     table-layout: fixed;
     display: table;
 }
+
+.badge {
+    width: 100%;
+    text-align: center;
+}
+
+.badge img {
+    height: 2em;
+}

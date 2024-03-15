@@ -8,5 +8,5 @@ You can check out my latest posts [here](/blog) or subscribe to my [RSS feed](/i
 
 ### my friends
 
-<a href="https://bardenn.uk"><img src="/img/bardenn.gif" alt="Bardenn"
+<a href="https://bardenn.uk"><img src="/img/buttons/bardenn.gif" alt="Bardenn"
             style="width: 100px" /></a>
