@@ -41,10 +41,16 @@ email = "hi@frereit.de"
 name = "Home"
 pageRef = "/"
 weight = 10
+
 [[menu.main]]
 name = "Blog"
 pageRef = "/blog"
 weight = 20
+
+[[menu.main]]
+name = "Bookmarks"
+pageRef = "/bookmarks"
+weight = 30
 
 [services.rss]
 limit = 50
